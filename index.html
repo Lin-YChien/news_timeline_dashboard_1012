@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天淵實業 募資儀表板</title>
+<meta name="description" content="天淵實業募資與營運歷程儀表板：公司狀態、時間軸、各階段大事紀與市場情緒分析">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ---------------------------------------------------------------------
+     Layout concept: same investor-profile spine as the 浩宇生醫 dashboard —
+     identity + public-market status stepper above a single horizontal
+     timeline band, event cards grouped by stage below. This company's own
+     disclosures only name one financing round (A輪) sitting on top of an
+     earlier capex build-out, so the band carries two stages, not five —
+     red for the pre-funding production build-out, orange for A輪, both
+     reusing the same hue slots the 浩宇生醫 page assigns to those rounds.
+  ------------------------------------------------------------------------ */
+  :root{
+    color-scheme: light;
+    --bg:            #eef1f4;
+    --surface:       #ffffff;
+    --surface-sunken:#f6f8fa;
+    --ink:           #10161c;
+    --ink-soft:      #5b6572;
+    --ink-faint:     #8a93a0;
+    --line:          #dde2e8;
+    --accent:        #df6620;
+    --accent-ink:    #ffffff;
+    --stage-pre:     #ad1f1f;
+    --stage-a:       #df6620;
+    --sentiment-pos: #1f7a3d;
+    --sentiment-pos-bg: rgba(31,122,61,0.1);
+    --sentiment-neu: #5b6572;
+    --sentiment-neu-bg: rgba(91,101,114,0.1);
+    --sentiment-neg: #ad1f1f;
+    --sentiment-neg-bg: rgba(173,31,31,0.1);
+    --shadow: 0 1px 2px rgba(16,22,28,0.04), 0 8px 24px rgba(16,22,28,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg:            #0c0e11;
+      --surface:       #15181d;
+      --surface-sunken:#1b1f25;
+      --ink:           #f1f3f5;
+      --ink-soft:      #9aa3ad;
+      --ink-faint:     #6b7480;
+      --line:          #262b32;
+      --accent:        #9f3c08;
+      --accent-ink:    #ffffff;
+      --stage-pre:     #ef5147;
+      --stage-a:       #9f3c08;
+      --sentiment-pos: #6fcf8e;
+      --sentiment-pos-bg: rgba(111,207,142,0.14);
+      --sentiment-neu: #9aa3ad;
+      --sentiment-neu-bg: rgba(154,163,173,0.14);
+      --sentiment-neg: #ef5147;
+      --sentiment-neg-bg: rgba(239,81,71,0.14);
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:            #0c0e11;
+    --surface:       #15181d;
+    --surface-sunken:#1b1f25;
+    --ink:           #f1f3f5;
+    --ink-soft:      #9aa3ad;
+    --ink-faint:     #6b7480;
+    --line:          #262b32;
+    --accent:        #9f3c08;
+    --accent-ink:    #ffffff;
+    --stage-pre:     #ef5147;
+    --stage-a:       #9f3c08;
+    --sentiment-pos: #6fcf8e;
+    --sentiment-pos-bg: rgba(111,207,142,0.14);
+    --sentiment-neu: #9aa3ad;
+    --sentiment-neu-bg: rgba(154,163,173,0.14);
+    --sentiment-neg: #ef5147;
+    --sentiment-neg-bg: rgba(239,81,71,0.14);
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  *{ box-sizing: border-box; }
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Noto Sans TC', sans-serif;
+    margin: 0;
+    padding-inline: 0;
+  }
+  .page{
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 64px;
+  }
+  .main-grid{
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    gap: 24px;
+    align-items: start;
+  }
+  .main-col{
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    min-width: 0;
+  }
+  .side-col{ min-width: 0; }
+  @media (min-width: 861px){
+    .side-col{ position: sticky; top: 20px; }
+  }
+  @media (max-width: 860px){
+    .main-grid{ grid-template-columns: 1fr; }
+  }
+  .mono{ font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+  .display{ font-family: 'Archivo', 'IBM Plex Sans', sans-serif; }
+
+  /* ---------- header ---------- */
+  header.hero{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 22px;
+  }
+  .company-id h1{
+    font-family: 'Archivo', sans-serif;
+    font-weight: 700;
+    font-size: clamp(26px, 4.5vw, 36px);
+    letter-spacing: -0.01em;
+    margin: 0 0 6px 0;
+    text-wrap: balance;
+  }
+  .company-id .tag{
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    max-width: 48ch;
+    line-height: 1.55;
+  }
+  .status-block{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    min-width: 260px;
+  }
+  .status-label{
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .stepper{
+    display: flex;
+    align-items: center;
+  }
+  .step{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    width: 76px;
+  }
+  .step .dot{
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--surface-sunken);
+    border: 2px solid var(--line);
+    z-index: 1;
+  }
+  .step .lbl{
+    font-size: 11px;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .step .bar{
+    position: absolute;
+    top: 5.5px;
+    left: -38px;
+    width: 76px;
+    height: 2px;
+    background: var(--line);
+    z-index: 0;
+  }
+  .step:first-child .bar{ display:none; }
+  .step.done .dot{ background: var(--accent); border-color: var(--accent); }
+  .step.done .bar{ background: var(--accent); }
+  .step.done .lbl{ color: var(--ink-soft); }
+  .step.current .dot{
+    background: var(--accent);
+    border-color: var(--accent);
+    width: 17px; height: 17px;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .step.current .lbl{ color: var(--ink); font-weight: 700; }
+
+  /* ---------- snapshot strip ---------- */
+  .snapshot{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 30px;
+  }
+  .snap-cell{
+    background: var(--surface);
+    padding: 13px 16px;
+    min-width: 0;
+  }
+  .snap-cell .k{
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-bottom: 5px;
+  }
+  .snap-cell .v{
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.5;
+    overflow-wrap: break-word;
+  }
+  .snap-cell .v .sub{ color: var(--ink-soft); font-size: 12px; }
+
+  /* ---------- timeline section ---------- */
+  section.timeline-wrap{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 20px 16px;
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+  }
+  .section-head{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .section-head h2{
+    font-family: 'Archivo', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+  }
+  .section-head .hint{
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+  .legend{
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .legend-item{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  .legend-item .swatch{
+    width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+  }
+  .tl-scroll{
+    overflow-x: auto;
+    margin: 0 -4px;
+    padding: 4px;
+  }
+  .tl-scroll svg{ display: block; min-width: 640px; width: 100%; height: auto; }
+
+  /* ---------- events ---------- */
+  .rounds{
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .round-group .round-head{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .round-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--chip-ink, #ffffff);
+  }
+  .round-chip .swatch{ width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .round-head .count{ font-size: 12px; color: var(--ink-faint); }
+
+  /* one horizontal row per record, stacked in chronological order —
+     replaces the earlier card-grid layout so each year reads left-to-right
+     along a single line instead of wrapping into a multi-column grid */
+  .card-row{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .event-card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--stage-color, var(--accent));
+    border-radius: 10px;
+    padding: 13px 18px;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .event-card .when{
+    flex: 0 0 110px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .event-card .date{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .event-card .amount{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: left;
+  }
+  .event-card .body{
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .event-card .investors{
+    font-size: 11.5px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+  .event-card .headline{
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+  .event-card .conclusion{
+    flex: 0 0 216px;
+    padding-left: 16px;
+    border-left: 1px dashed var(--line);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .event-card .conclusion .mark{ color: var(--stage-color, var(--accent)); flex-shrink: 0; }
+
+  @media (max-width: 760px){
+    .event-card{ flex-direction: column; align-items: stretch; gap: 9px; }
+    .event-card .when{ flex: none; flex-direction: row; align-items: baseline; justify-content: space-between; }
+    .event-card .amount{ text-align: right; }
+    .event-card .conclusion{
+      flex: none;
+      padding-left: 0;
+      border-left: none;
+      padding-top: 9px;
+      border-top: 1px dashed var(--line);
+    }
+  }
+
+  footer.pagefoot{
+    margin-top: 26px;
+    font-size: 11px;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    line-height: 1.7;
+  }
+
+  /* ---------- sentiment sidebar ---------- */
+  section.sentiment-wrap{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 16px;
+    box-shadow: var(--shadow);
+  }
+  section.sentiment-wrap .section-head{ margin-bottom: 12px; }
+  section.sentiment-wrap .section-head h2{ font-size: 14.5px; }
+  .sent-list{
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .sent-item{
+    padding-top: 13px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .sent-item:first-child{ padding-top: 0; border-top: none; }
+  .sent-when{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .sent-date{
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .sent-badge{
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2.5px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .sent-badge.positive{ color: var(--sentiment-pos); background: var(--sentiment-pos-bg); }
+  .sent-badge.neutral{  color: var(--sentiment-neu); background: var(--sentiment-neu-bg); }
+  .sent-badge.negative{ color: var(--sentiment-neg); background: var(--sentiment-neg-bg); }
+  .sent-event{
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.55;
+    font-weight: 500;
+  }
+  .sent-signal{
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+  .sent-signal .lbl{
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .sent-note{
+    font-size: 11.5px;
+    color: var(--sentiment-pos);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 640px){
+    header.hero{ flex-direction: column; }
+    .status-block{ align-items: flex-start; width: 100%; }
+    .snapshot{ grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <div class="company-id">
+      <h1 class="display">天淵實業</h1>
+      <div class="tag">台灣唯一擁有 8 吋微機電（Bolometer MEMS）產線與紅外線熱影像晶片 IDM 廠 — 隸屬無人載具供應鏈，推動台灣「非紅供應鏈」自主生產</div>
+    </div>
+    <div class="status-block">
+      <div class="status-label">目前公司狀態</div>
+      <div class="stepper" id="stepper"></div>
+    </div>
+  </header>
+
+  <div class="snapshot">
+    <div class="snap-cell">
+      <div class="k">經營團隊</div>
+      <div class="v">總經理 鍾熾宏</div>
+    </div>
+    <div class="snap-cell">
+      <div class="k">主要投資者</div>
+      <div class="v">兆豐管顧<span class="sub">（NT$5,000萬，10.04%，透過國發基金「加強投資策略性製造業實施方案」2024Q4開始投資）</span>・凌陽創新<span class="sub">3.11%</span>・創泓科技<span class="sub">2.5%</span>・映泰<span class="sub">2.5%</span>・鉅杉<span class="sub">0.15%</span><br><span class="sub">（占比為持股比例）</span></div>
+    </div>
+    <div class="snap-cell">
+      <div class="k">技術領域</div>
+      <div class="v">8吋微機電 Bolometer MEMS<span class="sub">／紅外線熱影像晶片 IDM</span></div>
+    </div>
+    <div class="snap-cell">
+      <div class="k">供應鏈夥伴</div>
+      <div class="v">上游環球晶<span class="sub">／下游智飛科技、凌陽創新</span></div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="main-col">
+      <section class="timeline-wrap">
+        <div class="section-head">
+          <h2 class="display">募資與營運時間軸</h2>
+          <div class="hint">2021 — 2026・資料最後更新於 2026/01 CES 聯合發表</div>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="tl-scroll">
+          <svg id="timelineSvg" viewBox="0 -18 960 188" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </section>
+
+      <section class="rounds-wrap">
+        <div class="section-head">
+          <h2 class="display">各階段大事紀</h2>
+          <div class="hint">依時間排序 · 結論為單則重點摘要</div>
+        </div>
+        <div class="rounds" id="rounds"></div>
+      </section>
+    </div>
+
+    <aside class="side-col">
+      <section class="sentiment-wrap">
+        <div class="section-head">
+          <h2 class="display">市場情緒分析</h2>
+        </div>
+        <div class="sent-list" id="sentimentList"></div>
+      </section>
+    </aside>
+  </div>
+
+  <footer class="pagefoot">
+    資料來源：天淵實業公司新聞曲線紀錄分析整理 · 金額依原始揭露幣別（新台幣）標示，未揭露者標示「未揭露」· 公開資料未提及興櫃／上市櫃掛牌，狀態暫列未上市 · 情緒分析反映新聞紀錄中的市場／產業訊號，非投資人情緒調查數據 · 本頁僅彙整募資與營運里程碑，不構成投資建議。
+  </footer>
+
+</div>
+
+<script>
+(function(){
+
+  // ---------------- data ----------------
+  // This company's own disclosures name exactly one financing round (A輪).
+  // Everything before it is capex build-out, not an equity round, so it
+  // gets a descriptive label instead of being forced into "天使期". Stage
+  // colour slots still follow the same red→orange ordering used on the
+  // 浩宇生醫 dashboard (earliest = red, A輪 = orange) for cross-page
+  // consistency; there is no B輪, 興櫃 or listing on record, so those
+  // slots simply don't appear here rather than being invented.
+  const STAGES = [
+    { id:'pre', label:'產線籌建期', color:'var(--stage-pre)', start:'2021-06-01', end:'2023-01-01' },
+    { id:'a',   label:'A輪',       color:'var(--stage-a)',   start:'2023-01-01', end:'2027-01-01', ongoing:true },
+  ];
+
+  const STATUS_STEPS = ['未上市', '興櫃', 'IPO', '上市／上櫃'];
+  const CURRENT_STATUS_INDEX = 0; // 未上市 — 公開資料未見興櫃／上市櫃掛牌紀錄
+
+  const EVENTS = [
+    {
+      stage:'pre', round:'產線籌建期', date:'2021', dateISO:'2021-06-01',
+      amount:null, investors:[], partners:[],
+      headline:'天淵實業自 2021 年起於桃園投資建置一條 8 吋微機電（MEMS）晶圓產線，為發展紅外線熱影像晶片 IDM 能力的基礎建設起點。',
+      conclusion:'啟動8吋MEMS產線建置投資'
+    },
+    {
+      stage:'a', round:'A輪', date:'2023', dateISO:'2023-01-01',
+      amount:'資本額 NT$1.3億元（原NT$3,400萬元）', investors:[], partners:[],
+      headline:'資本額由新台幣 3,400 萬元增資至 1.3 億元，啟動 A 輪股權募資的第一步。',
+      conclusion:'資本額增至1.3億元'
+    },
+    {
+      stage:'a', round:'A輪', date:'2024/12', dateISO:'2024-12-01',
+      amount:'未揭露', investors:['兆豐管顧（NT$5,000萬，10.04%，透過國發基金「加強投資策略性製造業實施方案」）'], partners:[],
+      headline:'天淵實業於 2024 年 12 月正式完成 A 輪募資：兆豐管顧透過國發基金「加強投資策略性製造業實施方案」挹注資金，凌陽創新、創泓科技、映泰、鉅杉並列參與投資人持股。',
+      conclusion:'完成A輪募資五家機構參與'
+    },
+    {
+      stage:'a', round:'A輪', date:'2025/09/24', dateISO:'2025-09-24',
+      amount:'累計NT$5億元', investors:[], partners:[],
+      headline:'天淵實業自 2021 年至今已累計斥資新台幣 5 億元於桃園 8 吋 MEMS 晶圓產線，預計年底量產。',
+      conclusion:'8吋MEMS產線年底前量產'
+    },
+    {
+      stage:'a', round:'A輪', date:'2026/01/05', dateISO:'2026-01-05',
+      amount:null, investors:[], partners:['凌陽創新（5236）'],
+      headline:'與凌陽創新於 CES 2026 共同發表全台首創、100% 國內自主研發的「AI 高幀率紅外熱成像 ISP 解決方案」。',
+      conclusion:'與凌陽創新CES聯合發表新品'
+    },
+  ];
+
+  const stageById = Object.fromEntries(STAGES.map(s => [s.id, s]));
+
+  // Sentiment read is kept separate from the funding timeline: these are
+  // industry/market signal points (not all of them are 天淵實業-specific
+  // actions), so they render as their own panel rather than being forced
+  // onto the band above.
+  const SENTIMENT = [
+    {
+      date:'2022',
+      event:'俄烏戰爭爆發，國際對軍工、夜視與紅外線感測自主化的意識抬頭',
+      signal:'組建「台灣卓越無人機海外商機聯盟」、「台灣無人載具系統研發聯盟（TUVSC）」',
+      sentiment:'positive', label:'正向樂觀',
+      note:'對天淵實業發展紅外線感測儀有好幫助'
+    },
+    {
+      date:'2026',
+      event:'與凌陽創新共同發表全台首創、100% 自主研發的 AI 高幀率紅外熱成像 ISP 解決方案',
+      signal:'熱成像市場年複合成長 12%，帶來長期成長潛力',
+      sentiment:'positive', label:'正向樂觀',
+      note:''
+    },
+  ];
+
+  // ---------------- status stepper ----------------
+  const stepperEl = document.getElementById('stepper');
+  stepperEl.innerHTML = STATUS_STEPS.map((label, i) => {
+    const cls = i < CURRENT_STATUS_INDEX ? 'done' : (i === CURRENT_STATUS_INDEX ? 'current' : '');
+    return `<div class="step ${cls}"><span class="bar"></span><span class="dot"></span><span class="lbl">${label}</span></div>`;
+  }).join('');
+
+  // ---------------- legend ----------------
+  const legendEl = document.getElementById('legend');
+  legendEl.innerHTML = STAGES.map(s =>
+    `<span class="legend-item"><span class="swatch" style="background:${s.color}"></span>${s.label}</span>`
+  ).join('');
+
+  // ---------------- timeline svg ----------------
+  function toTime(iso){ return new Date(iso + 'T00:00:00Z').getTime(); }
+  const domainStart = toTime('2020-10-01');
+  const domainEnd   = toTime('2027-01-01');
+  const W = 960, H = 170;
+  const padL = 14, padR = 14;
+  const bandY = 58, bandH = 30;
+  const plotW = W - padL - padR;
+
+  function xOf(iso){
+    const t = toTime(iso);
+    return padL + (t - domainStart) / (domainEnd - domainStart) * plotW;
+  }
+
+  const svgParts = [];
+
+  // year gridlines + labels
+  for (let y = 2021; y <= 2027; y++){
+    const x = xOf(`${y}-01-01`);
+    svgParts.push(`<line x1="${x}" y1="20" x2="${x}" y2="${bandY + bandH + 46}" stroke="var(--line)" stroke-width="1"/>`);
+    svgParts.push(`<text x="${x}" y="${bandY + bandH + 60}" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="var(--ink-faint)" text-anchor="middle">${y}</text>`);
+  }
+
+  // stage band segments
+  STAGES.forEach(s => {
+    const x0 = xOf(s.start);
+    const x1 = xOf(s.end);
+    const w = Math.max(x1 - x0, 1);
+    if (s.ongoing){
+      const stripeId = 'stripe-' + s.id;
+      svgParts.push(`
+        <defs>
+          <pattern id="${stripeId}" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+            <rect width="7" height="7" fill="${s.color}" opacity="0.22"/>
+            <line x1="0" y1="0" x2="0" y2="7" stroke="${s.color}" stroke-width="3.2"/>
+          </pattern>
+        </defs>
+        <rect x="${x0}" y="${bandY}" width="${w}" height="${bandH}" fill="url(#${stripeId})" rx="4"/>
+        <rect x="${x0}" y="${bandY}" width="${w}" height="${bandH}" fill="none" stroke="${s.color}" stroke-width="1.4" stroke-dasharray="3,3" rx="4"/>
+      `);
+    } else {
+      svgParts.push(`<rect x="${x0}" y="${bandY}" width="${w}" height="${bandH}" fill="${s.color}" opacity="0.86" rx="4"/>`);
+    }
+    // stage label centered on its segment (only if wide enough; the open-ended
+    // stage carries its label as the "進行中" tag below the band instead, to
+    // avoid crowding the hatched segment)
+    if (w > 54 && !s.ongoing){
+      svgParts.push(`<text x="${x0 + w/2}" y="${bandY + bandH/2 + 4}" font-family="Archivo, sans-serif" font-size="11.5" font-weight="700" fill="#ffffff" text-anchor="middle">${s.label}</text>`);
+    }
+  });
+
+  // segment divider ticks
+  const boundaries = STAGES.map(s => s.start);
+  boundaries.forEach(b => {
+    const x = xOf(b);
+    svgParts.push(`<line x1="${x}" y1="${bandY - 4}" x2="${x}" y2="${bandY + bandH + 4}" stroke="var(--surface)" stroke-width="2"/>`);
+  });
+
+  // start-of-history marker, at the first stage's own start date
+  const firstStage = STAGES[0];
+  svgParts.push(`<circle cx="${xOf(firstStage.start)}" cy="${bandY + bandH/2}" r="4" fill="var(--surface)" stroke="${firstStage.color}" stroke-width="2"/>`);
+
+  // event diamond markers above the band, with date labels. Markers close
+  // enough on the axis that their date strings would collide alternate
+  // onto a higher row instead (two-lane stagger), rather than overlapping.
+  const LABEL_GAP_PX = 72;
+  let prevX = null, prevLane = 0;
+  EVENTS.forEach((e) => {
+    if (e.stage === firstStage.id && e.dateISO === firstStage.start) return; // already marked on the band start
+    const x = xOf(e.dateISO);
+    const color = stageById[e.stage].color;
+    const lane = (prevX !== null && (x - prevX) < LABEL_GAP_PX) ? (prevLane === 0 ? 1 : 0) : 0;
+    prevX = x; prevLane = lane;
+    const topY = lane === 0 ? 30 : 10;
+    svgParts.push(`
+      <line x1="${x}" y1="${topY + 8}" x2="${x}" y2="${bandY - 3}" stroke="${color}" stroke-width="1.3" stroke-dasharray="2,2"/>
+      <rect x="${x-5}" y="${topY}" width="10" height="10" fill="${color}" stroke="var(--surface)" stroke-width="1.5" transform="rotate(45 ${x} ${topY+5})"/>
+      <text x="${x}" y="${topY - 6}" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-soft)" text-anchor="middle">${e.date}</text>
+    `);
+  });
+
+  // open-stage label + "進行中" tag, placed below the band so it never
+  // competes with the hatch fill or the dashed outline
+  const lastStage = STAGES[STAGES.length - 1];
+  const xOpenStart = xOf(lastStage.start);
+  const xOpenEnd = xOf(lastStage.end);
+  svgParts.push(`<text x="${(xOpenStart + xOpenEnd)/2}" y="${bandY + bandH + 16}" font-family="Archivo, sans-serif" font-size="11" font-weight="700" fill="${lastStage.color}" text-anchor="middle">${lastStage.label}・進行中</text>`);
+
+  document.getElementById('timelineSvg').innerHTML = svgParts.join('');
+
+  // ---------------- round cards ----------------
+  // group consecutive events by stage, preserving chronological order within a stage
+  const groups = [];
+  EVENTS.forEach(e => {
+    let g = groups.find(g => g.stage === e.stage);
+    if (!g){ g = { stage: e.stage, label: stageById[e.stage].label, color: stageById[e.stage].color, items: [] }; groups.push(g); }
+    g.items.push(e);
+  });
+
+  const roundsEl = document.getElementById('rounds');
+  roundsEl.innerHTML = groups.map(g => `
+    <div class="round-group">
+      <div class="round-head">
+        <span class="round-chip" style="background:${g.color}"><span class="swatch"></span>${g.label}</span>
+        <span class="count">${g.items.length} 筆紀錄</span>
+      </div>
+      <div class="card-row">
+        ${g.items.map(e => `
+          <div class="event-card" style="--stage-color:${g.color}">
+            <div class="when">
+              <span class="date mono">${e.date}</span>
+              ${e.amount ? `<span class="amount mono">${e.amount}</span>` : ''}
+            </div>
+            <div class="body">
+              ${e.investors.length ? `<div class="investors">投資人：${e.investors.join('、')}</div>` : (e.partners.length ? `<div class="investors">合作夥伴：${e.partners.join('、')}</div>` : '')}
+              <div class="headline">${e.headline}</div>
+            </div>
+            <div class="conclusion"><span class="mark">▍</span>${e.conclusion}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  // ---------------- sentiment panel ----------------
+  const sentimentEl = document.getElementById('sentimentList');
+  sentimentEl.innerHTML = SENTIMENT.map(s => `
+    <div class="sent-item">
+      <div class="sent-when">
+        <span class="sent-date mono">${s.date}</span>
+        <span class="sent-badge ${s.sentiment}">${s.label}</span>
+      </div>
+      <div class="sent-event">${s.event}</div>
+      <div class="sent-signal"><span class="lbl">市場／投資人動向</span>${s.signal}</div>
+      ${s.note ? `<div class="sent-note">${s.note}</div>` : ''}
+    </div>
+  `).join('');
+
+})();
+</script>
+
+</body>
+</html>
